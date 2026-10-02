@@ -32,6 +32,7 @@ public:
     AacDecoder& operator=(const AacDecoder&) = delete;
 
     bool init(const Config& cfg);
+    void flush(); // receiver thread only: discard delayed decoder output and PCM
 
     // Feed one raw AAC frame. Returns the number of PCM samples now available.
     // On decoder error returns -1 but keeps the context alive (iOS audio

@@ -92,6 +92,13 @@ void SdlAudioOutput::stop() {
     }
 }
 
+void SdlAudioOutput::flush() {
+    if (!device_) return;
+    SDL_PauseAudioDevice(device_, 1);
+    SDL_ClearQueuedAudio(device_);
+    playing_ = false;
+}
+
 void SdlAudioOutput::push(const int16_t* samples, int count) {
     if (!device_ || !samples || count <= 0) return;
 

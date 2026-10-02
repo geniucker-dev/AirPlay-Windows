@@ -68,6 +68,9 @@ public:
         int                        ct          = 0;
         int                        sample_rate = 44100;
         bool                       mirror_hwaccel = false;
+        std::string                remote_ip;
+        uint16_t                   remote_control_port = 0;
+        int                        spf = 480;
     };
 
     bool setup_stream(int type, uint16_t& data_port, uint16_t& control_port,
@@ -84,6 +87,7 @@ public:
 
     // Thread-safe: forwards to AudioReceiver if a type-96 stream is alive.
     void set_audio_volume_db(float db);
+    void flush_audio(int next_sequence = -1);
 
     void teardown();
 

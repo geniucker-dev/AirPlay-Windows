@@ -23,6 +23,7 @@ public:
 
     bool start(int sample_rate, int channels);
     void stop();
+    void flush(); // producer thread only: clear and rebuild the startup cushion
 
     // Enqueue interleaved int16 samples. `count` is the total number of
     // int16 samples (NOT frames) — for stereo, that's 2 * frame_count.

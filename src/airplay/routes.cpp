@@ -22,6 +22,7 @@
 
 #include <cstdio>
 #include <chrono>
+#include <charconv>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -423,6 +424,11 @@ Response setup_airplay2_path(ClientSession& session, const Request& req) {
             opts.aes_iv               = session.aes_iv;
             opts.stream_connection_id = parsed.streams[i].stream_conn_id;
             opts.ct                   = parsed.streams[i].ct;
+            opts.remote_ip = session.remote_ip;
+            const int control_port = parsed.streams[i].remote_control_port;
+            opts.remote_control_port = (control_port > 0 && control_port <= 65535)
+                ? static_cast<uint16_t>(control_port) : 0;
+            opts.spf = parsed.streams[i].spf > 0 ? parsed.streams[i].spf : 480;
             opts.sample_rate          = 44100;  // TODO: parse from SETUP when != 44.1k
             // Prefer the live UI toggle when available; the static
             // session.mirror_hwaccel (seeded from the CLI flag) is
@@ -1473,17 +1479,25 @@ Response dispatch(const DeviceContext& ctx, ClientSession& session,
     if (req.method == "GET_PARAMETER")  return handle_get_parameter(req);
     if (req.method == "SET_PARAMETER")  return handle_set_parameter(session, req);
 
-    // RTSP FLUSH is iOS's ambiguous "buffer reset" verb. Observed flows:
-    //   - pre-playback / pre-track-change FLUSH followed by audio pkts
-    //     within ~1 ms (safe to ignore)
-    //   - user-pause FLUSH followed by 20+ seconds of silence, then a
-    //     SETUP or TEARDOWN on resume
-    // We can't distinguish the two up front, so anticipate pause here
-    // (push rate=0). The AudioReceiver silence watchdog flips rate back
-    // to 1 as soon as the next packet arrives, so a spurious mid-play
-    // FLUSH only shows pause for a fraction of a frame.
+    // FLUSH resets audio buffering as well as the UI state. RTP-Info seq
+    // fences late pre-FLUSH packets and allows a track's new sequence base.
     if (req.method == "FLUSH" || req.method == "PAUSE") {
         LOG_INFO << req.method << ": tentative pause";
+        if (session.streams) {
+            int next_sequence = -1;
+            const auto rtp_info = req.header("rtp-info");
+            const auto start = rtp_info.find("seq=");
+            if (start != std::string::npos) {
+                const char* begin = rtp_info.data() + start + 4;
+                const char* end = rtp_info.data() + rtp_info.size();
+                unsigned value = 0;
+                const auto parsed = std::from_chars(begin, end, value);
+                if (parsed.ec == std::errc{} && value <= 65535 &&
+                    (parsed.ptr == end || *parsed.ptr == ';' || *parsed.ptr == ','))
+                    next_sequence = static_cast<int>(value);
+            }
+            session.streams->flush_audio(next_sequence);
+        }
         if (session.renderer) {
             session.renderer->note_flush();
             session.renderer->push_playback_rate(0.0f);

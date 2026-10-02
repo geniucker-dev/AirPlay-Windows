@@ -1,18 +1,41 @@
 #include "audio/audio_output.h"
+#define SDL_MAIN_HANDLED
+#include <SDL.h>
 
 #include <array>
 #include <cstdint>
 
 int main() {
+    SDL_SetMainReady();
     ap::audio::SdlAudioOutput output;
     if (!output.start(44100, 2)) return 1;
-
-    // Ten AAC-ELD-sized stereo PCM blocks exceed the 80 ms start threshold.
-    // start() also verifies that SDL kept its logical queue at 44.1 kHz rather
-    // than exposing a native 48 kHz device rate to this class.
     std::array<int16_t, 960> silence{};
-    for (int i = 0; i < 10; ++i) {
-        output.push(silence.data(), static_cast<int>(silence.size()));
-    }
-    return output.queued_bytes() == 0 ? 2 : 0;
+    const auto push = [&] { output.push(silence.data(), static_cast<int>(silence.size())); };
+
+    // Less than 80 ms must remain buffered even while the dummy device runs.
+    push(); push();
+    SDL_Delay(60);
+    if (output.queued_bytes() != silence.size() * sizeof(int16_t) * 2) return 2;
+    for (int i = 0; i < 8; ++i) push();
+    SDL_Delay(300);
+    if (output.queued_bytes() != 0) return 3; // startup actually resumed consumption
+
+    // An underrun must pause and rebuild the cushion rather than repeatedly
+    // consuming one frame followed by silence. Then playback must resume.
+    push(); push();
+    SDL_Delay(60);
+    if (output.queued_bytes() != silence.size() * sizeof(int16_t) * 2) return 4;
+    for (int i = 0; i < 8; ++i) push();
+    SDL_Delay(300);
+    if (output.queued_bytes() != 0) return 5;
+    push(); push();
+    output.flush();
+    if (output.queued_bytes() != 0) return 6;
+    push(); push();
+    SDL_Delay(60);
+    if (output.queued_bytes() != silence.size() * sizeof(int16_t) * 2) return 7;
+    output.stop();
+    output.stop();
+    SDL_Quit();
+    return 0;
 }

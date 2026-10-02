@@ -347,6 +347,36 @@ if(AIRPLAY_BUILD_TESTS)
         src/log.cpp)
     target_include_directories(audio-output-smoke PRIVATE src)
     target_link_libraries(audio-output-smoke PRIVATE ${SDL2_TARGET})
+    add_executable(rtp-audio-buffer-test tests/rtp_audio_buffer_test.cpp)
+    target_include_directories(rtp-audio-buffer-test PRIVATE src)
+    add_test(NAME rtp-audio-buffer-test COMMAND rtp-audio-buffer-test)
+
+    add_executable(small-alac-test tests/small_alac_test.cpp
+        src/audio/aac_decoder.cpp src/log.cpp)
+    target_include_directories(small-alac-test PRIVATE src)
+    target_link_libraries(small-alac-test PRIVATE ${FFMPEG_TARGETS})
+    if(DEFINED FFMPEG_INCLUDE_DIRS_OK)
+        target_include_directories(small-alac-test PRIVATE ${FFMPEG_INCLUDE_DIRS_OK})
+    endif()
+    add_test(NAME small-alac-test COMMAND small-alac-test)
+
+    add_executable(audio-receiver-test tests/audio_receiver_test.cpp
+        src/audio/audio_receiver.cpp src/audio/aac_decoder.cpp
+        src/audio/audio_output.cpp src/net/socket.cpp src/video/video_recorder.cpp src/log.cpp)
+    target_include_directories(audio-receiver-test PRIVATE src)
+    target_link_libraries(audio-receiver-test PRIVATE OpenSSL::Crypto ${FFMPEG_TARGETS} ${SDL2_TARGET})
+    if(DEFINED FFMPEG_INCLUDE_DIRS_OK)
+        target_include_directories(audio-receiver-test PRIVATE ${FFMPEG_INCLUDE_DIRS_OK})
+    endif()
+    if(WIN32)
+        target_link_libraries(audio-receiver-test PRIVATE ws2_32 iphlpapi)
+    endif()
+    add_test(NAME audio-receiver-test COMMAND audio-receiver-test)
+    add_test(NAME audio-receiver-dual-stack-test COMMAND audio-receiver-test --dual)
+    add_test(NAME audio-receiver-ipv6-test COMMAND audio-receiver-test --ipv6)
+    set_tests_properties(audio-receiver-test audio-receiver-dual-stack-test audio-receiver-ipv6-test PROPERTIES
+        ENVIRONMENT "SDL_AUDIODRIVER=dummy" TIMEOUT 10)
+
     add_test(NAME audio-output-smoke COMMAND audio-output-smoke)
     set_tests_properties(audio-output-smoke PROPERTIES
         ENVIRONMENT "SDL_AUDIODRIVER=dummy")

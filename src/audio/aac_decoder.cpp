@@ -183,12 +183,19 @@ bool AacDecoder::init(const Config& cfg) {
     return true;
 }
 
+void AacDecoder::flush() {
+    if (impl_->ctx) avcodec_flush_buffers(impl_->ctx);
+    impl_->pcm.clear();
+}
+
 int AacDecoder::decode(const uint8_t* frame, int size) {
     if (!impl_->ctx || !frame || size <= 0) return 0;
 
     av_packet_unref(impl_->pkt);
-    impl_->pkt->data = const_cast<uint8_t*>(frame);
-    impl_->pkt->size = size;
+    // FFmpeg bit readers require AV_INPUT_BUFFER_PADDING_SIZE zero bytes
+    // beyond the payload. Network packet vectors do not provide that padding.
+    if (av_new_packet(impl_->pkt, size) < 0) return -1;
+    std::memcpy(impl_->pkt->data, frame, static_cast<std::size_t>(size));
 
     int ret = avcodec_send_packet(impl_->ctx, impl_->pkt);
     if (ret < 0 && ret != AVERROR(EAGAIN)) {

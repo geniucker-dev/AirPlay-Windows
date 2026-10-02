@@ -226,6 +226,10 @@ bool StreamSession::setup_stream(int type,
         audio_ = std::make_unique<ap::audio::AudioReceiver>();
         ap::audio::AudioReceiver::Config ac;
         ac.data_sock   = d_sock;
+        ac.control_sock = c_sock;
+        ac.remote_ip = opts.remote_ip;
+        ac.remote_control_port = opts.remote_control_port;
+        ac.spf = opts.spf;
         ac.aes_key     = opts.aes_key;
         ac.aes_iv      = opts.aes_iv;
         ac.ct          = opts.ct;
@@ -239,14 +243,13 @@ bool StreamSession::setup_stream(int type,
             audio_.reset();
         }
 
-        // Control socket: iOS sends retransmit/feedback packets here; we
-        // just keep it bound so iOS isn't flooded with ICMP unreachables.
+        // The receiver polls both sockets and handles RAOP retransmissions.
         StreamChannel ch;
         ch.type         = type;
         ch.data_port    = d_port;
         ch.control_port = c_port;
         ch.data_sock    = INVALID_SOCK;   // consumed by AudioReceiver
-        ch.control_sock = c_sock;
+        ch.control_sock = audio_ ? INVALID_SOCK : c_sock; // owned on successful start
         channels_.push_back(ch);
         return true;
     }
@@ -295,6 +298,10 @@ bool StreamSession::start_ntp(const std::string& remote_ip, uint16_t remote_port
 
 void StreamSession::set_audio_volume_db(float db) {
     if (audio_) audio_->set_volume_db(db);
+}
+
+void StreamSession::flush_audio(int next_sequence) {
+    if (audio_) audio_->flush(next_sequence);
 }
 
 void StreamSession::teardown() {
