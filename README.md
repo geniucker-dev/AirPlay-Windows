@@ -40,7 +40,7 @@ native Windows stack — no Bonjour SDK, no Apple runtime dependency.
 | **H.264 decoder (libavcodec)**               | OK    | FFmpeg — SPS/PPS extracted from avcC          |
 | **Real-time video renderer (SDL2)**          | OK    | Range/matrix-aware YUV->RGB, GPU scaling      |
 | **Audio UDP RTP + AES-CBC decrypt**          | OK    | `lib/raop_buffer.c`                           |
-| **RAOP RTP seq dedup**                       | OK    | 65k bitset, sliding window                    |
+| **RAOP RTP loss recovery + reordering**      | OK    | 256-packet window, resend requests            |
 | **AAC-ELD decoder (libavcodec)**             | OK    | ASC `F8 E8 50 00` built from scratch          |
 | **SDL2 / WASAPI audio output**               | OK    | int16 stereo 44.1 kHz, push mode              |
 | **Volume control (`SET_PARAMETER` -> gain)** | OK    | dB -> linear, atomic, fast-path unity         |
